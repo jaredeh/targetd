@@ -32,7 +32,7 @@ from utils import TargetdError
 default_config_path = "/etc/target/targetd.yaml"
 
 default_config = dict(
-    block_pools=['vg-targetd'],
+    block_pools=[],
     fs_pools=[],
     user="admin",
     log_level='info',
@@ -42,6 +42,8 @@ default_config = dict(
     ssl=False,
     ssl_cert="/etc/target/targetd_cert.pem",
     ssl_key="/etc/target/targetd_key.pem",
+    server_name=""
+    server_port=18700
 )
 
 config = {}
@@ -236,7 +238,7 @@ def main():
         note = "(TLS no)"
 
     try:
-        server = server_class(('', 18700), TargetHandler)
+        server = server_class((config['server_name'], config['server_port']), TargetHandler)
         log.info("started server %s", note)
         server.serve_forever()
     except KeyboardInterrupt:
