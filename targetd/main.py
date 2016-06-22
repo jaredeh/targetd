@@ -20,19 +20,22 @@
 import os
 import setproctitle
 import json
-from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
+try:
+    from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
+except ImportError:
+    from http.server import BaseHTTPRequestHandler, HTTPServer
 import yaml
 import itertools
 import socket
 import ssl
 import traceback
 import logging as log
-from utils import TargetdError
+from .utils import TargetdError
 
 default_config_path = "/etc/target/targetd.yaml"
 
 default_config = dict(
-    block_pools=[],
+    block_pools=['vg-targetd'],
     fs_pools=[],
     user="admin",
     log_level='info',
@@ -169,7 +172,7 @@ def load_config(config_path):
         if config is None:
             config = {}
 
-    for key, value in default_config.iteritems():
+    for key, value in list(default_config.items()):
         if key not in config:
             config[key] = value
 
@@ -193,8 +196,8 @@ def load_config(config_path):
 
 def update_mapping():
     # wait until now so submodules can import 'main' safely
-    import block
-    import fs
+    from . import block
+    from . import fs
 
     try:
         mapping.update(block.initialize(config))
