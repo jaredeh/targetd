@@ -18,8 +18,8 @@
 
 import os
 import time
-from nfs import Nfs, Export
-from utils import invoke, TargetdError
+from .nfs import Nfs, Export
+from .utils import invoke, TargetdError
 
 
 # Notes:
@@ -59,7 +59,7 @@ def initialize(config_dict):
         try:
             create_sub_volume(os.path.join(pool, fs_path))
             create_sub_volume(os.path.join(pool, ss_path))
-        except TargetdError, e:
+        except(TargetdError, e):
             log.error('Unable to create required subvolumes')
             log.error(e.msg)
             raise
@@ -240,7 +240,7 @@ def _fs_hash():
 
 
 def fs(req):
-    return _fs_hash().values()
+    return list(_fs_hash().values())
 
 
 def ss(req, fs_uuid, fs_cache=None):

@@ -16,7 +16,7 @@ import hashlib
 import os
 import os.path
 import shlex
-from utils import invoke
+from .utils import invoke
 
 
 def md5(t):
@@ -122,7 +122,7 @@ class Export(object):
     def _validate_key_pairs(kp):
         if kp:
             if isinstance(kp, dict):
-                for k, v in kp.items():
+                for k, v in list(kp.items()):
                     if k not in Export.key_pair:
                         raise ValueError('option %s not valid' % k)
 
@@ -236,11 +236,11 @@ class Export(object):
 
     def options_list(self):
         rc = []
-        for k, v in self.bool_option.items():
+        for k, v in list(self.bool_option.items()):
             if self.options & v:
                 rc.append(k)
 
-        for k, v in self.key_value_options.items():
+        for k, v in list(self.key_value_options.items()):
             rc.append('%s=%s' % (k, v))
 
         return rc
