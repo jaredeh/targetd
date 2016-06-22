@@ -42,7 +42,7 @@ default_config = dict(
     ssl=False,
     ssl_cert="/etc/target/targetd_cert.pem",
     ssl_key="/etc/target/targetd_key.pem",
-    server_name=""
+    server_name="",
     server_port=18700
 )
 
@@ -120,10 +120,10 @@ class TargetHandler(BaseHTTPRequestHandler):
                     "invalid method parameter(s)")
                 log.debug(traceback.format_exc())
                 raise
-            except TargetdError, td:
+            except(TargetdError, td):
                 error = (td.error, str(td))
                 raise
-            except Exception, e:
+            except(Exception, e):
                 error = (-1, "%s: %s" % (type(e).__name__, e))
                 log.debug(traceback.format_exc())
                 raise
