@@ -35,7 +35,7 @@ from .utils import TargetdError
 default_config_path = "/etc/target/targetd.yaml"
 
 default_config = dict(
-    block_pools=['vg-targetd'],
+    block_pools=[],
     fs_pools=[],
     user="admin",
     log_level='info',
