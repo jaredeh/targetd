@@ -22,6 +22,8 @@ from rtslib_fb import (
 import lvm
 from .main import TargetdError
 from .utils import ignored, name_check
+from blkdiscovery import BlkDiscovery
+
 
 
 def get_vg_lv(pool_name):
@@ -98,10 +100,17 @@ def initialize(config_dict):
             raise TargetdError(-1, "VG pool and thin pool from same VG not supported")
 
     return dict(
-        vol_list=volumes,
-        vol_create=create,
-        vol_destroy=destroy,
-        vol_copy=copy,
+        disk_list=disk_list,
+        pv_list=pv_list,
+        pv_create=pv_create,
+        pv_destroy=pv_destroy,
+        vg_list=vg_list,
+        vg_create=vg_create,
+        vg_destroy=vg_destroy,
+        vol_list=vol_list,
+        vol_create=vol_create,
+        vol_destroy=vol_destroy,
+        vol_copy=vol_copy,
         export_list=export_list,
         export_create=export_create,
         export_destroy=export_destroy,
@@ -117,8 +126,50 @@ def initialize(config_dict):
         access_group_map_destroy=access_group_map_destroy,
     )
 
+def disk_list(req, params=None):
+    bd = BlkDiscovery()
+    blocks = bd.details()
+    return [blocks]
 
-def volumes(req, pool):
+def pv_list(req, params=None):
+    output = []
+    pvlistobj = lvm.listPvs()
+    pvlist = pvlistobj.open()
+    for pv in pvlist:
+        output.append( dict(name=pv.getName(),
+                            size=pv.getSize(),
+                            devsize=pv.getDevSize(),
+                            freesize=pv.getFree(),
+                            mdacount=pv.getMdaCount(),
+                            uuid=pv.getUuid()))
+
+    pvlistobj.close()
+    return output
+
+def pv_create(req, path):
+    lvm.pvCreate(path)
+    return [{}]
+
+def pv_destroy(req, path):
+    lvm.pvRemove(path)
+    return [{}]
+
+def vg_list(req, params=None):
+    output = lvm.listVgNames()
+    return output
+
+def vg_create(req, name, path):
+    vg = lvm.vgCreate(name)
+    vg.extend(path)
+    vg.close()
+    return [{}]
+
+def vg_destroy(req, name):
+    vg = lvm.vgOpen(name,"w")
+    a = vg.remove()
+    return [{a}]
+
+def vol_list(req, pool):
     output = []
     vg_name, lv_pool = get_vg_lv(pool)
     with vgopen(vg_name) as vg:
@@ -135,11 +186,11 @@ def volumes(req, pool):
     return output
 
 
-def create(req, pool, name, size):
+def vol_create(req, pool, name, size):
 
     # Check to ensure that we don't have a volume with this name already,
     # lvm will fail if we try to create a LV with a duplicate name
-    if any(v['name'] == name for v in volumes(req, pool)):
+    if any(v['name'] == name for v in vol_list(req, pool)):
         raise TargetdError(
             TargetdError.NAME_CONFLICT,
             "Volume with that name exists")
@@ -156,7 +207,7 @@ def create(req, pool, name, size):
             vg.createLvLinear(name, int(size))
 
 
-def destroy(req, pool, name):
+def vol_destroy(req, pool, name):
     with ignored(RTSLibNotInCFS):
         fm = FabricModule('iscsi')
         t = Target(fm, target_name, mode='lookup')
@@ -174,12 +225,12 @@ def destroy(req, pool, name):
         vg.lvFromName(name).remove()
 
 
-def copy(req, pool, vol_orig, vol_new, timeout=10):
+def vol_copy(req, pool, vol_orig, vol_new, timeout=10):
     """
     Create a new volume that is a copy of an existing one.
     Since 0.6, requires thinp support.
     """
-    if any(v['name'] == vol_new for v in volumes(req, pool)):
+    if any(v['name'] == vol_new for v in vol_list(req, pool)):
         raise TargetdError(
             TargetdError.NAME_CONFLICT,
             "Volume with that name exists")
@@ -196,7 +247,7 @@ def copy(req, pool, vol_orig, vol_new, timeout=10):
             raise NotImplementedError("liblvm lacks thin snap support")
 
 
-def export_list(req):
+def export_list(req, params=None):
     try:
         fm = FabricModule('iscsi')
         t = Target(fm, target_name, mode='lookup')
@@ -384,7 +435,7 @@ def initiator_list(req, standalone_only=False):
         if _condition(node_acl, standalone_only))
 
 
-def access_group_list(req):
+def access_group_list(req, params=None):
     """Return a list of access group
 
     Iterate all iSCSI rtslib-fb.NodeACLGroup via rtslib-fb.TPG.node_acls().
@@ -491,7 +542,7 @@ def access_group_init_del(req, ag_name, init_id, init_type):
     RTSRoot().save_to_file()
 
 
-def access_group_map_list(req):
+def access_group_map_list(req, params=None):
     """
     Return a list of dictionaries in this format:
         {

@@ -29,8 +29,12 @@ import itertools
 import socket
 import ssl
 import traceback
+import base64
 import logging as log
 from .utils import TargetdError
+import pprint
+import inspect
+pp = pprint.PrettyPrinter(indent=4)
 
 default_config_path = "/etc/target/targetd.yaml"
 
@@ -63,16 +67,24 @@ class TargetHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
 
+        import pprint
+        pp = pprint.PrettyPrinter(indent=4)
         rpcdata = ""
         error = None
-
+        import inspect
         # get basic auth string, strip "Basic "
+        #pp.pprint(inspect.getmembers(self.headers))
+
         try:
-            auth64 = self.headers.getheader("Authorization")[6:]
-            in_user, in_pass = auth64.decode('base64').split(":")
+            auth64 = self.headers.get("Authorization")[6:]
+            auth64 = base64.b64decode(auth64)
+            if type(auth64) == bytes:
+                auth64 = auth64.decode("utf-8")
+            in_user, in_pass = auth64.split(":")
         except:
-            self.send_error(400)
-            return
+            print("noauth")
+            #self.send_error(400)
+            #return
 
         if in_user != config['user'] or in_pass != config['password']:
             self.send_error(401)
@@ -82,12 +94,20 @@ class TargetHandler(BaseHTTPRequestHandler):
             self.send_error(404)
             return
 
+        print("fasdf")
         try:
             error = (-1, "jsonrpc error")
             self.id = None
             try:
-                content_len = int(self.headers.getheader('content-length'))
-                req = json.loads(self.rfile.read(content_len))
+                content_len = int(self.headers.get('content-length'))
+                red = self.rfile.read(content_len)
+                if type(red) == bytes:
+                    red = red.decode("utf-8")
+                print("-------------------------------------------------")
+                pp.pprint(red)
+                print("-------------------------------------------------")
+                req = json.loads(red)
+                pp.pprint(req)
             except ValueError:
                 # see http://www.jsonrpc.org/specification for errcodes
                 error = (-32700, "parse error")
@@ -109,6 +129,7 @@ class TargetHandler(BaseHTTPRequestHandler):
                 raise
 
             try:
+                print('method:',method,' params:',params)
                 if params:
                     result = mapping[method](self, **params)
                 else:
@@ -117,27 +138,30 @@ class TargetHandler(BaseHTTPRequestHandler):
                 error = (-32601, "method %s not found" % method)
                 log.debug(traceback.format_exc())
                 raise
-            except TypeError:
+            except TypeError as td:
                 error = (
                     TargetdError.INVALID_PARMETER,
                     "invalid method parameter(s)")
                 log.debug(traceback.format_exc())
-                raise
-            except(TargetdError, td):
+                raise td
+            except TargetdError as td:
                 error = (td.error, str(td))
                 raise
-            except(Exception, e):
+            except Exception as e:
                 error = (-1, "%s: %s" % (type(e).__name__, e))
                 log.debug(traceback.format_exc())
                 raise
 
             rpcdata = json.dumps(dict(result=result, id=self.id))
 
-        except:
+        except Exception as e:
             log.debug('Error=%s, msg=%s' % error)
             rpcdata = json.dumps(
                 dict(error=dict(code=error[0], message=error[1]), id=self.id))
+            raise e
         finally:
+            rpcdata = bytes(rpcdata,"UTF-8")
+            print(rpcdata)
             self.wfile.write(rpcdata)
 
 
@@ -224,14 +248,14 @@ def main():
     try:
         load_config(default_config_path)
     except AttributeError:
-        return -1
+        raise#return -1
 
     setproctitle.setproctitle("targetd")
 
     try:
         update_mapping()
     except:
-        return -1
+        raise#return -1
 
     if config['ssl']:
         server_class = TLSHTTPService
@@ -248,6 +272,6 @@ def main():
         log.info("SIGINT received, shutting down")
         if server is not None:
             server.socket.close()
-        return -1
+        raise#return -1
 
     return 0

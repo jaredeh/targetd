@@ -19,6 +19,14 @@
 # kernel target.
 
 import sys
+import os
+sys.path.append(os.path.abspath("../../"))
+sys.path.append(os.path.abspath("../"))
+sys.path.append(os.path.abspath("."))
+
+sys.path.append(os.path.abspath("../../blkdiscovery"))
+sys.path.append(os.path.abspath("../blkdiscovery"))
+
 from targetd import main
 
 sys.exit(main())
